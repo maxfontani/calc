@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="./styles.css">
+    <title>Online Calculator</title>
+</head>
+
+<body>
+    <div class="calcOuter">
+        <div class="calcInner">
+            <div class="calcDisplayOuter">
+                <div class="calcDisplayTop" id="calc-display-top"></div>
+                <input class="calcDisplay" id="calc-display" type="text" readonly placeholder="0">
+                <button class="focusButton" id="auto-focus"></button>
+                <div class="calcDisplayBot" id="calc-display-bot"></div>
+            </div>
+            <div class="calcButtonsOuter">
+                <div class="calcButtonsInner">
+                    <button class="calcButton" type="num" value="7">7</button>
+                    <button class="calcButton" type="num" value="8">8</button>
+                    <button class="calcButton" type="num" value="9">9</button>
+                    <button class="calcButton calcOp" type="op" value="sign">+/-</button>
+                    <button class="calcButton calcOp" type="op" value="del">DEL</button>
+                    <button class="calcButton" type="num" value="4">4</button>
+                    <button class="calcButton" type="num" value="5">5</button>
+                    <button class="calcButton" type="num" value="6">6</button>
+                    <button class="calcButton calcOp" type="op" value="mult">✕</button>
+                    <button class="calcButton calcOp" type="op" value="div">÷</button>
+                    <button class="calcButton" type="num" value="1">1</button>
+                    <button class="calcButton" type="num" value="2">2</button>
+                    <button class="calcButton" type="num" value="3">3</button>
+                    <button class="calcButton calcOp" type="op" value="sub">–</button>
+                    <button class="calcButton calcCancel" type="op" value="cancel">C</button>
+                    <button class="calcButton" type="num" value="0">0</button>
+                    <button class="calcButton" type="num" value=".">.</button>
+                    <button class="calcButton calcOp" type="op" value="add">+</button>
+                    <button class="calcButton calcEquals" type="op" value="equals">=</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="calc.js"></script>
+</body>
+
+</html>
