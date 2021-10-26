@@ -1,7 +1,7 @@
 export default class Calc {
   #MAX_INPUT_LENGTH = 18;
   #NUMS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "."];
-  #OPS = ["+", "-", "*", "/", "Enter", "Delete", "Backspace", "Escape"];
+  #OPS = ["Enter", "Delete", "Backspace", "Escape", "+", "-", "*", "/"];
 
   #display;
   #topDisplay;
@@ -12,6 +12,8 @@ export default class Calc {
   #keyValMap;
   #cache = null;
   #lastOp = null;
+  #lastInput = null;
+  #lastInputType = null;
   #isFloat = false;
   #isNewInput = true;
 
@@ -59,67 +61,15 @@ export default class Calc {
     };
   }
 
-  press(key) {
-    const type = this.#NUMS.includes(key)
-      ? "num"
-      : this.#OPS.includes(key)
-      ? "op"
-      : undefined;
-    let val;
-
-    if (type === "num") {
-      val = key;
-    } else if (type === "op") {
-      val = this.#keyValMap[key];
-    } else return;
-
-    if (!val || !type) return;
+  press(key, type = this.#getKeyType(key), val = this.#getKeyVal(key, type)) {
+    if (typeof type === "undefined" || typeof val === "undefined") return;
 
     try {
-      if (type === "num") {
-        this.#onNumPress(val);
-        return;
-      }
-      this.#onOpPress(val);
+      return type === "num" ? this.#onNumPress(val) : this.#onOpPress(val);
     } catch (err) {
-      switch (err.message) {
-        case "DIV_BY_ZERO": {
-          this.#showBotMsgDebounced(
-            "Division by zero not allowed. Restarting..",
-            2000
-          );
-          this.#setInitValues();
-          break;
-        }
-        default: {
-          this.#setError(err, "Oops, something went wrong. Restarting..");
-          break;
-        }
-      }
+      if (err.message === "DIV_BY_ZERO") return this.#onDivByZero();
+      this.#setError(err, "Oops, something went wrong. Restarting..");
     }
-  }
-
-  #onNumPress(num) {
-    if (this.#isNewInput) {
-      this.#display.value = num;
-      this.#isNewInput = this.#isFloat = false;
-    }
-    if (this.#display.value.length >= this.#MAX_INPUT_LENGTH) {
-      showBotMsgDebounced(
-        `Max input length is ${this.#MAX_INPUT_LENGTH} digits!`,
-        2000
-      );
-      return;
-    }
-    if (num === ".") {
-      if (this.#isFloat) return;
-      this.#isFloat = true;
-      this.#display.value = this.#display.value
-        ? this.#display.value.concat(num)
-        : "0.";
-    }
-    if (this.#display.value === "0") return;
-    this.#display.value = this.#display.value.concat(num);
   }
 
   #onOpPress(op) {
@@ -137,7 +87,7 @@ export default class Calc {
           this.#updateTopDisplay(op);
           break;
         }
-        this.#onEquals();
+        this.#onEquals(op);
         break;
       }
       case "sign": {
@@ -145,29 +95,71 @@ export default class Calc {
         break;
       }
       default: {
-        this.#processOp();
-        this.#updateTopDisplay(op);
+        this.#processOp(op);
         break;
       }
     }
   }
 
-  #processOp() {}
+  #processOp(op) {
+    try {
+      const disp = Number(this.#display.value);
+      if (this.#cache === null || this.#lastInputType === "equals") {
+        this.#cache = disp;
+        this.#updateTopDisplay(op);
+        return;
+      }
+      if (this.#lastInputType === "op" || this.#lastInputType === null) {
+        this.#updateTopDisplay(op);
+        return;
+      }
+      this.#updateTopDisplay(op);
+      this.#onEquals(this.#lastOp);
+    } finally {
+      this.#lastOp = op;
+      this.#lastInputType = "op";
+      this.#isNewInput = true;
+    }
+  }
+  #onEquals(op) {
+    try {
+      let res;
+      const disp = Number(this.#display.value);
+      if (this.#lastInputType === "equals") {
+        res = this.#calculate(disp, this.#lastInput, this.#lastOp);
+        this.#updateTopDisplay("equals", this.#lastInput);
+        this.#display.value = this.#cache = res;
+        return;
+      }
 
-  #calculate(n1, n2) {
-    if (this.#lastOp === "div" && n2 === 0) {
+      this.#lastInput = disp;
+
+      res = this.#calculate(this.#cache, disp, this.#lastOp);
+      this.#updateTopDisplay(op, disp);
+      this.#display.value = res;
+
+      this.#cache = res;
+    } finally {
+      this.#lastInputType = "equals";
+      this.#isNewInput = true;
+    }
+  }
+
+  #calculate(n1, n2, op) {
+    if (op === "div" && n2 === 0) {
       throw new Error("DIV_BY_ZERO");
     }
-    let res = this.#opFnMap[this.#lastOp](n1, n2);
+    let res = this.#opFnMap[op](n1, n2);
     res = Number(res.toFixed(8));
-    if (!Number.isFinite(res) || res.toString().length >= MAX_INPUT_LENGTH) {
+    if (
+      !Number.isFinite(res) ||
+      res.toString().length >= this.#MAX_INPUT_LENGTH
+    ) {
       this.#showBotMsgDebounced("Sorry, the result is too big/small!", 3000);
       return Number(this.#display.value);
     }
     return res;
   }
-
-  #onEquals() {}
 
   #onDel() {
     const len = this.#display.value.length;
@@ -203,20 +195,52 @@ export default class Calc {
     }
   }
 
-  #updateTopDisplay(operation) {
-    if (operation === "sign") {
+  #updateTopDisplay(condition, prevNum) {
+    if (condition === "sign") {
       const prevNum = -this.#cache;
       this.#topDisplay.innerText = `negate(${prevNum})`;
       return;
     }
-    if (operation === "equals") {
+    if (condition === "equals") {
       this.#topDisplay.innerText =
         this.#lastOp === null
           ? `${Number(this.#display.value)} =`
-          : `${num1} ${this.#opSymMap[this.#lastOp]} ${num2} =`;
+          : `${this.#cache} ${this.#opSymMap[this.#lastOp]} ${prevNum} =`;
       return;
     }
-    this.#topDisplay.innerText = `${num1} ${this.#opSymMap[this.#lastOp]}`;
+    this.#topDisplay.innerText = `${this.#cache} ${this.#opSymMap[condition]} ${
+      typeof prevNum !== "undefined" ? `${prevNum} =` : ""
+    }`;
+  }
+
+  #onNumPress(num) {
+    try {
+      if (this.#isNewInput || this.#display.value === "0") {
+        if (num === ".") {
+          this.#display.value = "0.";
+          this.#isFloat = true;
+          return;
+        }
+        this.#display.value = num;
+        this.#isFloat = false;
+        return;
+      }
+      if (this.#display.value.length >= this.#MAX_INPUT_LENGTH) {
+        showBotMsgDebounced(
+          `Max input length is ${this.#MAX_INPUT_LENGTH} digits!`,
+          2000
+        );
+        return;
+      }
+      if (num === ".") {
+        if (this.#isFloat) return;
+        this.#isFloat = true;
+      }
+      this.#display.value = this.#display.value.concat(num);
+    } finally {
+      this.#lastInputType = "num";
+      this.#isNewInput = false;
+    }
   }
 
   #showBotMsgDebounced(msg, ms = 2500) {
@@ -240,6 +264,27 @@ export default class Calc {
   #setError(err, msg) {
     console.error(err);
     this.#showBotMsgDebounced(msg, 2000);
+    this.#setInitValues();
+  }
+
+  #getKeyType(key) {
+    return this.#NUMS.includes(key)
+      ? "num"
+      : this.#OPS.includes(key)
+      ? "op"
+      : undefined;
+  }
+
+  #getKeyVal(key, type) {
+    if (!type) return;
+    return type === "num" ? key : this.#keyValMap[key];
+  }
+
+  #onDivByZero() {
+    this.#showBotMsgDebounced(
+      "Division by zero not allowed. Restarting..",
+      2000
+    );
     this.#setInitValues();
   }
 }
